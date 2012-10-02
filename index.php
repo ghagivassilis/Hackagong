@@ -1,35 +1,53 @@
 <?php 
 
+  date_default_timezone_set('Australia/Sydney');
+
   require_once 'sdk/facebook.php';
+  require_once 'cache.class.php';
 
-  $facebook = new Facebook(array(
-    'appId'  => '104236416398654',
-    'secret' => 'SECRET_KEY',
-  ));
-  $access_token = $facebook->getAccessToken();
-  $params = array('access_token' => $access_token);
-  $events = array();
-  $i = 0;
+  $c = new Cache();
+  $c->setCachePath('cache/');
+  $c->eraseExpired();
 
-  $objs = $facebook->api('139968802813349/events', 'GET', $params);
+  if ($c->isCached('events')) {
 
-  foreach($objs['data'] as $data) {
+    $events = $c->retrieve('events');
 
-      $events[$i]['id'] = $data['id'];
-      $events[$i]['name'] = $data['name'];
-      $events[$i]['start_time'] = $data['start_time'];
-      $events[$i]['location'] = $data['location'];
+  } else {
 
-      $objs2 = $facebook->api($data['id'].'/invited', 'GET', $params);
+    $facebook = new Facebook(array(
+      'appId'  => '104236416398654',
+      'secret' => 'SECRET_KEY',
+    ));
+    $access_token = $facebook->getAccessToken();
+    $params = array('access_token' => $access_token);
+    $events = array();
+    $i = 0;
 
-      foreach ($objs2['data'] as $attendee) {
-        if ($attendee['rsvp_status'] == 'attending' || $attendee['rsvp_status'] == 'unsure') {
-          $attending[] = array('id'=>$attendee['id'],'name'=>$attendee['name']);
+    $objs = $facebook->api('139968802813349/events', 'GET', $params);
+
+    foreach($objs['data'] as $data) {
+
+        $events[$i]['id'] = $data['id'];
+        $events[$i]['name'] = $data['name'];
+        $events[$i]['start_time'] = $data['start_time'];
+        $events[$i]['end_time'] = $data['end_time'];
+        $events[$i]['location'] = $data['location'];
+
+        $objs2 = $facebook->api($data['id'].'/invited', 'GET', $params);
+
+        foreach ($objs2['data'] as $attendee) {
+          if ($attendee['rsvp_status'] == 'attending' || $attendee['rsvp_status'] == 'unsure') {
+            $attending[] = array('id'=>$attendee['id'],'name'=>$attendee['name']);
+          }
         }
-      }
 
-      $events[$i]['attending'] = $attending;
-      $i++;
+        $events[$i]['attending'] = $attending;
+        $i++;
+
+    }
+
+    $c->store('events', $events, 60*60*24);
 
   }
 
@@ -50,14 +68,14 @@ nathan@nathanwaters.com
     <title>Hackagong</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Hackagong is Wollongong's monthly hackathon competition and host of Startup Weekend Wollongong">
-	<meta property="og:title" content="Hackagong"/>
-	<meta property="og:url" content="http://hackagong.com/"/>
+  <meta property="og:title" content="Hackagong"/>
+  <meta property="og:url" content="http://hackagong.com/"/>
     <meta property="og:image" content="http://hackagong.com/img/hfb.jpg"/>
     <meta property="og:description" content="Hackagong is Wollongong's monthly hackathon competition and host of Startup Weekend Wollongong"/>
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css" />
     <link rel="stylesheet" type="text/css" href="css/bootstrap-responsive.min.css" />
-	<link href="/favicon.ico" type="image/x-icon" rel="icon" />
-	<link href="/favicon.ico" type="image/x-icon" rel="shortcut icon" />
+  <link href="/favicon.ico" type="image/x-icon" rel="icon" />
+  <link href="/favicon.ico" type="image/x-icon" rel="shortcut icon" />
     <style>
     html,body {
       height:100%;
@@ -68,7 +86,6 @@ nathan@nathanwaters.com
     .container {
       padding:40px 40px 200px 40px;
       background-color:#fff;
-      height:100%;
     }
     .header {
       margin-bottom:40px;
@@ -81,8 +98,8 @@ nathan@nathanwaters.com
       text-align:right;
     }
     .header .right img {
-    	height:60px;
-    	width:60px
+      height:60px;
+      width:60px
     }
     .input-append {
        padding-top: 20px;
@@ -112,7 +129,7 @@ nathan@nathanwaters.com
     foreach ($events as $event) {
       echo '<div class="row"><div class="span4">';
       echo '<h2><a href="https://facebook.com/events/'.$event['id'].'">'.$event['name'].'</a></h2>';
-      echo '<h4>'.date("j, M Y",strtotime($event['start_time'])).'</h4>';
+      echo '<h4>'.date("ga, D j M",strtotime($event['start_time'])).' - '.date("ga, D j M",strtotime($event['end_time'])).'</h4>';
       echo '</div><div class="span8" style="text-align:right">';
 
       foreach ($event['attending'] as $attending) {
@@ -124,7 +141,6 @@ nathan@nathanwaters.com
   </div>
 </body>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8/jquery.min.js"></script>
-<script src="./js/jquery.slabtext.min.js"></script>
 
 <script>
  $(document).ready(function () {
